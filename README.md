@@ -2,7 +2,7 @@
 
 **How do you stop an LLM sales agent from leaking data it should never have seen?**
 
-A hands-on lab that attacks a B2B sales agent with 16 prompt-injection and data-exfiltration
+A hands-on lab that attacks a B2B sales agent with 23 prompt-injection and data-exfiltration
 techniques, then shows which defenses actually work. It compares three designs of the *same* agent.
 
 > Educational lab. Every attack runs against my own agent and my own test database.
@@ -34,13 +34,35 @@ enough prompt can extract it. The reliable fix is making sure the agent never re
 ## Attack catalog (`attacks/attacks.json`)
 
 Direct requests · false authority · instruction override · role-play · format smuggling (JSON/CSV) ·
-encoding (base64, translation) · completion attacks · social engineering · context extraction.
+encoding (base64, translation) · completion attacks · social engineering · context extraction ·
+**business pretexts** (ERP export, quote breakdown, supplier contact) ·
+**indirect injection** (a poisoned instruction hidden in a public product description).
 Attacks are written in English and Spanish.
 
 ## Results
 
-<!-- Replace with the real output of `python -m src.evaluate` (see results/results.md). -->
-_Run the evaluation and paste the table here._
+Model: `gemini-3.6-flash` · 23 attacks · single-turn · run date: YYYY-MM-DD
+
+<!-- TODO: paste the full table from results/results.md here -->
+
+**Leak rate by design**
+
+| Design | Attacks that leaked internal data |
+|---|---|
+| `vulnerable` | X / 23 |
+| `prompt_only` | X / 23 |
+| `hardened` | X / 23 |
+
+### Key findings
+
+1. TODO: which attack categories broke `prompt_only`, and why.
+2. TODO: what `hardened` blocked, and which layer stopped each attack (data layer vs. output filter).
+3. TODO: anything surprising (an attack that failed on `vulnerable`, or a near miss on `hardened`).
+
+### What this does not prove
+
+- One model, single-turn attacks, and a small catalog. A clean run is evidence, not a guarantee.
+- The detector finds verbatim leaks, not inference ("is your margin above 30%?").
 
 ## Run it
 
@@ -62,7 +84,7 @@ contains any of them (numbers are matched tolerantly: `27315`, `27.315`, `27,315
 ## Limitations and roadmap
 
 - Detects verbatim leaks, not inference ("is your margin above 30%?").
-- Single-turn attacks only. Next: multi-turn escalation and indirect injection through product descriptions.
+- Single-turn attacks only. Next: multi-turn escalation.
 - One model tested. Next: compare several LLMs.
 - Next: agent tool-calling with least-privilege scopes.
 
