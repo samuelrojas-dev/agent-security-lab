@@ -111,15 +111,39 @@ Raw replies for every attack are in [`results/results.json`](results/results.jso
 
 ## Run it
 
+**1. Create the environment and install dependencies**
+
 ```bash
-python -m venv .venv && source .venv/bin/activate
+# macOS / Linux
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env            # fill in your keys
-# 1. In Supabase SQL editor: run supabase/schema.sql, then supabase/seed.sql
+cp .env.example .env
+```
+
+```bat
+:: Windows (cmd)
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+```
+
+**2. Fill in `.env`** with your Supabase URL and keys and your Gemini API key.
+
+**3. Create the database.** In the Supabase SQL editor, run `supabase/schema.sql`, then `supabase/seed.sql`,
+then `supabase/seed_extra.sql` (the product used for the indirect-injection test).
+
+**4. Run the evaluation and the tests**
+
+```bash
 python -m src.evaluate          # runs all attacks vs all modes -> results/
 pytest -m "not live"            # offline tests (also run in CI)
 pytest -m live -s               # real attacks vs the hardened agent
 ```
+
+The evaluation saves its progress in `results/cache.json`, so if you hit an API quota you can run
+the same command again later and it continues where it stopped.
 
 ## How leaks are detected
 
