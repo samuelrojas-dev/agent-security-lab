@@ -208,7 +208,7 @@ class ToolAgent:
             to = str(args.get("to", ""))
             decision = guard.authorize_email(to) if guard else None
             delivered = decision is None or decision.allowed
-            content = f"{args.get('subject', '')}\n{args.get('body', '')}"
+            content = f"{to}\n{args.get('subject', '')}\n{args.get('body', '')}"  # the address can carry data too
             transcript.egress.append(Egress("email", to, email_clearance(to), content, delivered,
                                             "" if delivered else decision.reason))
             if not delivered:
@@ -216,7 +216,7 @@ class ToolAgent:
                 return {"error": f"blocked by policy: {decision.reason}"}
         try:
             result = tool.run(args)
-        except (TypeError, ValueError) as error:
+        except (TypeError, ValueError, ArithmeticError) as error:  # e.g. quantity 1e999
             return {"error": str(error)}
         if guard:
             guard.observe(tool.label, result)
