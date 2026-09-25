@@ -1,4 +1,4 @@
-# Run: model `compromised` · data `local` · 34 attacks · 1 trial(s) each
+# Run: model `compromised` · data `local` · 34 attacks · 1 trial(s) each · native tool calling
 
 | Design | Attacks leaked | Attack success rate (95% CI) | Secrets exposed | Leak channels | Actions blocked |
 |---|---|---|---|---|---|

@@ -67,7 +67,8 @@ def write_reports(out: Path, meta: dict, results: list[dict], summary: dict, att
 
     judged = bool(meta.get("judge"))
     lines = [f"# Run: model `{meta['model']}` · data `{meta['data']}` · {meta['attacks']} attacks "
-             f"· {meta['trials']} trial(s) each" + (f" · judge `{meta['judge']}`" if judged else ""), "",
+             f"· {meta['trials']} trial(s) each" + (f" · judge `{meta['judge']}`" if judged else "")
+             + (f" · {meta['tool_protocol']} tool calling" if meta.get("tool_protocol") else ""), "",
              "| Design | Attacks leaked | Attack success rate (95% CI) | Secrets exposed | Leak channels | Actions blocked |"
              + (" Found only by judge |" if judged else ""),
              "|---|---|---|---|---|---|" + ("---|" if judged else "")]

@@ -58,6 +58,20 @@ past it. The reply to the customer cannot simply be closed, so for that channel 
 back to content inspection against the internal values the agent actually saw. That part is a
 heuristic, and the results show where it breaks.
 
+### Native tool calling, one policy
+
+Tool designs call tools through the provider's own API: Claude `tool_use` blocks (strict JSON
+schemas) and Gemini function calling. Parallel calls are supported: each call is checked on its own
+and all results go back in one message. The SDKs never execute a tool themselves (no tool runner,
+Gemini's automatic function calling is off). Every call goes through the lab's own loop, because
+that loop is where the policy is enforced.
+
+Each provider's own content is replayed unchanged on the next request. Claude's thinking blocks and
+Gemini's thought signatures must come back as they were sent. `--tool-protocol text` switches to a
+`CALL {...}` text protocol that any model can follow, for models without native tools or to compare
+the two. Both protocols share one `_execute`, and the compromised model speaks both. CI runs the
+worst-case suite through each protocol and checks that the results match, attack by attack.
+
 ## Results
 
 ### v2: worst-case model (`python -m src.evaluate`)
@@ -189,6 +203,7 @@ pytest -m "not live"                      # offline tests (also run in CI)
 python -m src.evaluate --model gemini --trials 3          # 3 runs per attack, 95% CIs in the report
 python -m src.evaluate --model claude --modes prompt_only agent_prompt_only
 python -m src.evaluate --model gemini --judge claude      # + LLM judge for inference leaks
+python -m src.evaluate --model claude --tool-protocol text  # text protocol instead of native tools
 python -m src.judge --model claude                        # measure the judge first (precision/recall)
 pytest -m live -s                                         # real attacks vs the structural designs
 ```
@@ -258,7 +273,7 @@ Three attacks target this gap directly: `presupposition-yes-no`, `threshold-prob
 | `src/flow.py` | Labels, sink clearances and the flow guard |
 | `src/detect.py` | Leak detection with evidence |
 | `src/judge.py` | LLM judge for inference leaks, and its calibration |
-| `src/llm.py` | Gemini, Claude and the compromised model |
+| `src/llm.py` | Gemini, Claude and the compromised model, each with chat and native tool calling |
 | `src/mutate.py` | Evasion operators: base64, leetspeak, zero-width, payload split, prefix injection |
 | `src/evaluate.py` | Runner, scoring, trials, CI gate |
 | `src/report.py` | Wilson intervals, blast radius, Markdown / JSON / SARIF |
@@ -280,8 +295,9 @@ Three attacks target this gap directly: `presupposition-yes-no`, `threshold-prob
   for internal recipients without opening the reply channel.
 - The compromised model is one worst-case policy. It is an upper bound on what the data can reach,
   not a model of how a real model behaves; real-model rates need `--trials` against real models.
-- The tool protocol is text-based (`CALL {...}`) so every model runs the same loop. Native tool
-  calling per provider is next.
+- Native tool calling is checked offline against the exact request shapes, with fake clients. No
+  real Claude or Gemini call has been made with it yet. Comparing native and text protocol leak rates
+  on real models is an open question: the two phrasings may not be equally easy to inject.
 - v1 real-model results cover one model and the chat designs only. Next: the tool designs on
   Gemini and Claude with several trials each.
 

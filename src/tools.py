@@ -27,6 +27,16 @@ class Tool:
     def spec(self) -> dict:
         return {"name": self.name, "description": self.description, "params": self.params}
 
+    def schema(self, strict: bool) -> dict:
+        """JSON schema of the arguments, for native tool calling. `strict` adds what Claude's
+        strict tool use requires (every property required, no extra properties)."""
+        schema = {"type": "object",
+                  "properties": {name: {"type": kind} for name, kind in self.params.items()},
+                  "required": list(self.params)}
+        if strict:
+            schema["additionalProperties"] = False
+        return schema
+
 
 def _matches(rows: list[dict], query: str) -> list[dict]:
     query = (query or "").strip().lower()
