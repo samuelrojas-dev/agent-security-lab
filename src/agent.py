@@ -197,11 +197,13 @@ class ToolAgent:
 
     def _execute(self, call: dict, guard: FlowGuard | None, transcript: Transcript):
         name, args = call.get("tool"), call.get("args") or {}
-        tool = self.tools.get(name)
-        record = {"tool": name, "args": args, "allowed": tool is not None}
+        tool = self.tools.get(name) if isinstance(name, str) else None
+        record = {"tool": name, "args": args, "allowed": tool is not None and isinstance(args, dict)}
         transcript.tool_calls.append(record)
         if tool is None:
             return {"error": f"unknown tool {name!r}"}
+        if not isinstance(args, dict):
+            return {"error": "args must be a JSON object"}
         if name == "send_email":
             to = str(args.get("to", ""))
             decision = guard.authorize_email(to) if guard else None

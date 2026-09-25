@@ -15,6 +15,7 @@ so for that channel it falls back to content inspection against the concrete int
 the agent has actually seen. That part is heuristic and an encoding the detector does not know
 gets through; the lab measures exactly that.
 """
+import re
 from dataclasses import dataclass, field
 from enum import IntEnum
 
@@ -28,9 +29,20 @@ class Label(IntEnum):
     INTERNAL = 1
 
 
-def email_clearance(address: str, internal_domains=INTERNAL_DOMAINS) -> Label:
-    domain = address.rsplit("@", 1)[-1].strip().lower()
-    return Label.INTERNAL if domain in internal_domains else Label.PUBLIC
+ADDRESS = re.compile(r"<?[^@\s<>,;]+@([^@\s<>,;]+)>?")
+
+
+def email_clearance(to: str, internal_domains=INTERNAL_DOMAINS) -> Label:
+    """INTERNAL only if every recipient is a well-formed address on an internal domain.
+    One outside or unparseable recipient makes the whole message PUBLIC (fail closed)."""
+    recipients = [r for r in re.split(r"[,;\s]+", to.strip()) if r]
+    if not recipients:
+        return Label.PUBLIC
+    for recipient in recipients:
+        match = ADDRESS.fullmatch(recipient)
+        if not match or match.group(1).lower().rstrip(".") not in internal_domains:
+            return Label.PUBLIC
+    return Label.INTERNAL
 
 
 @dataclass

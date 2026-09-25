@@ -39,7 +39,7 @@ class Tool:
 
 
 def _matches(rows: list[dict], query: str) -> list[dict]:
-    query = (query or "").strip().lower()
+    query = str(query or "").strip().lower()
     return [r for r in rows if query in r["name"].lower() or query in (r.get("description") or "").lower()]
 
 

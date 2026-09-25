@@ -99,7 +99,8 @@ def run_suite(attacks, modes, llm, data, trials, secrets, cache_file: Path | Non
         for mode, agent in agents.items():
             runs = []
             for trial in range(trials):
-                key = (f"{attack['id']}|{mode}|{trial}" + (f"|judge={judge.name}" if judge else "")
+                key = (f"{llm.name}|data={data}|{attack['id']}|{mode}|{trial}"
+                       + (f"|judge={judge.name}" if judge else "")
                        + (f"|tools={agents[mode].protocol}" if hasattr(agents[mode], "protocol") else ""))
                 if key in cache:
                     runs.append(cache[key])
@@ -147,6 +148,8 @@ def main(argv=None) -> int:
     parser.add_argument("--gate", nargs="+", default=[], choices=ALL_MODES,
                         help="exit 1 if any attack leaks against these designs")
     args = parser.parse_args(argv)
+    if not set(args.gate) <= set(args.modes):
+        parser.error(f"--gate {sorted(set(args.gate) - set(args.modes))} not in --modes")
 
     llm = make_llm(args.model)
     attacks = load_attacks(args.attacks)
