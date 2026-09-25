@@ -5,6 +5,9 @@ on:
       model:
         description: "gemini or claude"
         default: gemini
+      judge:
+        description: "LLM judge for inference leaks: claude, gemini, or empty for none"
+        default: ""
 jobs:
   attack:
     runs-on: ubuntu-latest
@@ -15,6 +18,7 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       LAB_MODEL: ${{ inputs.model }}
+      LAB_JUDGE: ${{ inputs.judge }}
       REQUEST_DELAY: "4"
     steps:
       - uses: actions/checkout@v4
