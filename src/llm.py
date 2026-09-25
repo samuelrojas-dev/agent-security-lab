@@ -67,7 +67,7 @@ class GeminiLLM(LLM):
         from google import genai  # lazy import
 
         self._client = genai.Client(api_key=env("GEMINI_API_KEY"))
-        self._model = env("GEMINI_MODEL", "gemini-3.6-flash")
+        self._model = env("GEMINI_MODEL", "gemini-3.8-flash")
         self.name = self._model
 
     def chat(self, system: str, messages: list[dict]) -> str:
