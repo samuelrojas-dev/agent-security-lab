@@ -11,6 +11,8 @@ every instruction it sees, including instructions hidden in tool results.
 
 > Educational lab. Every attack runs against my own agent and my own test data.
 
+**Read the write-up:** [Prompt rules measure behavior. Architecture gives guarantees.](docs/findings.md)
+
 The idea behind the compromised model: a prompt-based defense can only be measured, and it
 depends on the model. A structural defense can be *proven*, by showing it holds when the model
 does the worst thing it could. That proof needs no API key, so it runs in CI on every push.
