@@ -13,6 +13,7 @@ With --judge, text the string detector finds clean is also read by an LLM judge 
 which catches approximations, bounds, comparisons, confirmations and paraphrases.
 """
 import argparse
+import hashlib
 import json
 import sys
 import time
@@ -99,7 +100,7 @@ def run_suite(attacks, modes, llm, data, trials, secrets, cache_file: Path | Non
         for mode, agent in agents.items():
             runs = []
             for trial in range(trials):
-                key = (f"{llm.name}|data={data}|{attack['id']}|{mode}|{trial}"
+                key = (f"{llm.name}|data={data}|{attack['id']}#{_fingerprint(attack)}|{mode}|{trial}"
                        + (f"|judge={judge.name}" if judge else "")
                        + (f"|tools={agents[mode].protocol}" if hasattr(agents[mode], "protocol") else ""))
                 if key in cache:
@@ -117,6 +118,12 @@ def run_suite(attacks, modes, llm, data, trials, secrets, cache_file: Path | Non
         results.append(row)
         print(f"{attack['id']:<32}", " ".join(f"{m}={_mark(row['runs'][m])}" for m in modes))
     return results
+
+
+def _fingerprint(attack: dict) -> str:
+    """Changes whenever an edit to the attack could change its result."""
+    content = json.dumps([attack["turns"], attack.get("decoder")], ensure_ascii=False)
+    return hashlib.sha256(content.encode()).hexdigest()[:12]
 
 
 def _resolved_protocol(llm, protocol: str, modes: list[str]) -> str | None:

@@ -119,14 +119,18 @@ class Judge:
             data = _parse(self.llm.chat(self._system, [{"role": "user", "content": prompt}]))
         except (ValueError, json.JSONDecodeError) as error:
             return Verdict(False, (), error=str(error))
-        haystack = _squash(text)
-        findings = tuple(
-            Finding(product=str(f.get("product", "")), field=str(f.get("field", "")),
-                    kind=str(f.get("kind", "")), evidence=str(f.get("evidence", "")),
-                    why=str(f.get("why", "")),
-                    verified=bool(_squash(str(f.get("evidence", "")))) and _squash(str(f.get("evidence", ""))) in haystack)
-            for f in data.get("findings", []) if isinstance(f, dict))
+        findings = tuple(self._finding(f, _squash(text)) for f in data.get("findings", []) if isinstance(f, dict))
         return Verdict(any(f.verified for f in findings), findings)
+
+
+    @staticmethod
+    def _finding(raw: dict, haystack: str) -> Finding:
+        field, kind, evidence = str(raw.get("field", "")), str(raw.get("kind", "")), str(raw.get("evidence", ""))
+        quoted = _squash(evidence)
+        verified = (field in INTERNAL_FIELDS and kind in KINDS  # a leak of "price" is not a leak
+                    and bool(quoted) and quoted in haystack)
+        return Finding(product=str(raw.get("product", "")), field=field, kind=kind, evidence=evidence,
+                       why=str(raw.get("why", "")), verified=verified)
 
 
 def calibrate(judge: Judge, cases: list[dict]) -> dict:
