@@ -32,10 +32,20 @@ def summarize(results: list[dict], modes: list[str], total_secrets: int) -> dict
             "asr_ci95": [low, high],
             "secrets_exposed": len(exposed),
             "secrets_total": total_secrets,
-            "channels": dict(Counter(c for t in trials for c in {leak["channel"] for leak in t["leaks"]})),
+            "channels": dict(Counter(c for t in trials for c in _channels(t))),
             "actions_blocked": sum(len(t["blocked"]) for t in trials),
+            "judge_only": sum(bool(t["leaked"]) and not t["leaks"] for t in trials),
+            "judge_errors": sum(t.get("judge_errors", 0) for t in trials),
         }
     return summary
+
+
+def _verified(trial: dict) -> list[dict]:
+    return [i for i in trial.get("inferences", []) if i["verified"]]
+
+
+def _channels(trial: dict) -> set[str]:
+    return {leak["channel"] for leak in trial["leaks"] + _verified(trial)}
 
 
 def _cell(runs: list[dict]) -> str:
@@ -55,16 +65,19 @@ def write_reports(out: Path, meta: dict, results: list[dict], summary: dict, att
         json.dumps({"meta": meta, "summary": summary, "results": results}, ensure_ascii=False, indent=1),
         encoding="utf-8")
 
+    judged = bool(meta.get("judge"))
     lines = [f"# Run: model `{meta['model']}` · data `{meta['data']}` · {meta['attacks']} attacks "
-             f"· {meta['trials']} trial(s) each", "",
-             "| Design | Attacks leaked | Attack success rate (95% CI) | Secrets exposed | Leak channels | Actions blocked |",
-             "|---|---|---|---|---|---|"]
+             f"· {meta['trials']} trial(s) each" + (f" · judge `{meta['judge']}`" if judged else ""), "",
+             "| Design | Attacks leaked | Attack success rate (95% CI) | Secrets exposed | Leak channels | Actions blocked |"
+             + (" Found only by judge |" if judged else ""),
+             "|---|---|---|---|---|---|" + ("---|" if judged else "")]
     for mode, s in summary.items():
         channels = ", ".join(f"{c} {n}" for c, n in sorted(s["channels"].items())) or "-"
         empty = f" ({s['empty_trials']} empty)" if s["empty_trials"] else ""
         lines.append(f"| `{mode}` | {s['attacks_leaked']}/{s['attacks']}{empty} | {s['asr']:.0%} "
                      f"[{s['asr_ci95'][0]:.0%}, {s['asr_ci95'][1]:.0%}] | "
-                     f"{s['secrets_exposed']}/{s['secrets_total']} | {channels} | {s['actions_blocked']} |")
+                     f"{s['secrets_exposed']}/{s['secrets_total']} | {channels} | {s['actions_blocked']} |"
+                     + (f" {s['judge_only']} |" if judged else ""))
     lines += ["", "| Attack | Category | " + " | ".join(modes) + " |", "|---|---|" + "---|" * len(modes)]
     for r in results:
         lines.append(f"| {r['id']} | {r['category']} | " + " | ".join(_cell(r["runs"][m]) for m in modes) + " |")
@@ -74,14 +87,16 @@ def write_reports(out: Path, meta: dict, results: list[dict], summary: dict, att
     for r in results:
         for mode in modes:
             leaks = [leak for t in r["runs"][mode] for leak in t["leaks"]]
-            if not leaks:
+            inferred = [i for t in r["runs"][mode] for i in _verified(t)]
+            if not leaks and not inferred:
                 continue
-            how = sorted({f"{leak['channel']}→{leak['destination']} ({leak['technique']})" for leak in leaks})
+            how = sorted({f"{leak['channel']}→{leak['destination']} ({leak['technique']})" for leak in leaks}
+                         | {f"{i['channel']}→{i['destination']} (judge: {i['kind']} {i['field']})" for i in inferred})
             sarif_results.append({
                 "ruleId": r["category"].replace(" ", "-"),
                 "level": "error",
                 "message": {"text": f"[{mode}] attack '{r['id']}' exfiltrated {len({l['secret'] for l in leaks})} "
-                                    f"internal value(s) via {', '.join(how)}"},
+                                    f"internal value(s) and {len(inferred)} inference(s) via {', '.join(how)}"},
                 "locations": [{"physicalLocation": {"artifactLocation": {"uri": attacks_file}}}],
                 "partialFingerprints": {"attackMode": f"{r['id']}|{mode}"},
             })
