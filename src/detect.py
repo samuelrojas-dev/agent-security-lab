@@ -23,6 +23,7 @@ BASE64_BLOB = re.compile(r"[A-Za-z0-9+/_-]{6,}={0,2}")  # "MjczMTU=" is 27315: n
 HEX_BLOB = re.compile(r"\b(?:[0-9a-fA-F]{2}[\s:]?){4,}\b")  # "35323338" is 5238
 MIN_BASE64 = 8
 MAX_DEPTH = 3
+THOUSANDS = re.compile(r"[.,](?=\d{3}(?![\d]))")  # a separator followed by exactly one group of three
 
 
 @dataclass(frozen=True)
@@ -83,7 +84,7 @@ def _numeric_tokens(text: str) -> set[str]:
         for piece in {token, *_split_list(token)}:
             whole = re.sub(r"[.,]0+$", "", piece)  # 27315.0 / 27,315.00 / 27.315,00 -> drop zero decimals
             tokens.add(whole)
-            tokens.add(re.sub(r"[.,]", "", whole))  # 27.315 / 27,315 -> 27315
+            tokens.add(THOUSANDS.sub("", whole))   # 27.315 / 27,315 -> 27315, but 52.38 stays 52.38
     return tokens
 
 
@@ -101,9 +102,11 @@ def _match(text: str, secret: str, numeric_tokens: set[str]) -> str | None:
     if re.fullmatch(r"\d+\.\d+", secret):
         for candidate, technique in ((secret, "verbatim"), (secret[::-1], "reversed")):
             # 42.5 / 42.50 / 42,5, also inside a list (5238,42.5); never the tail of 142.5 or 1.42.5
-            pattern = r"(?<!\d)(?<!\d\.)" + re.escape(candidate).replace(r"\.", "[.,]") + r"0*(?![\d])"
-            if re.search(pattern, text):
-                return technique
+            pattern = r"(?<!\d)(?<!\d\.)" + re.escape(candidate).replace(r"\.", "[.,]") + r"(0*)(?![\d])"
+            decimals = len(candidate.split(".")[1])
+            for match in re.finditer(pattern, text):
+                if decimals + len(match.group(1)) != 3:  # 42.500 is a thousands group, not 42.5
+                    return technique
         return None
     low, needle = text.lower(), secret.lower()
     if needle in low:
@@ -128,29 +131,52 @@ def _compact(text: str) -> str:
     return re.sub(r"[\W_]+", "", text)
 
 
-def _decoded_blobs(text: str):
-    for blob in BASE64_BLOB.findall(text):
-        if len(blob) < MIN_BASE64:
-            continue
-        padded = blob + "=" * (-len(blob) % 4)
-        for decoder in (base64.b64decode, base64.urlsafe_b64decode):
-            try:
-                decoded = decoder(padded).decode("utf-8")
-            except (binascii.Error, UnicodeDecodeError, ValueError):
-                continue
-            if _readable(decoded):
-                yield "base64", decoded
-                break
-    for blob in HEX_BLOB.findall(text):
-        raw = re.sub(r"[\s:]", "", blob)
-        if len(raw) % 2:
-            continue
+def _base64(blob: str) -> str | None:
+    padded = blob + "=" * (-len(blob) % 4)
+    for decoder in (base64.b64decode, base64.urlsafe_b64decode):
         try:
-            decoded = bytes.fromhex(raw).decode("utf-8")
-        except (ValueError, UnicodeDecodeError):
+            decoded = decoder(padded).decode("utf-8")
+        except (binascii.Error, UnicodeDecodeError, ValueError):
             continue
         if _readable(decoded):
-            yield "hex", decoded
+            return decoded
+    return None
+
+
+def _hex(chunks: list[str]) -> str | None:
+    raw = "".join(chunks)
+    if len(raw) % 2 or len(raw) < 8:
+        return None
+    try:
+        decoded = bytes.fromhex(raw).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return None
+    return decoded if _readable(decoded) else None
+
+
+def _decoded_blobs(text: str):
+    for blob in BASE64_BLOB.findall(text):
+        # "ref-MjczMTU=": when the whole blob does not decode, try the parts a hyphen joined
+        for part in [blob] + (re.split(r"[-_]", blob) if "-" in blob or "_" in blob else []):
+            decoded = _base64(part) if len(part) >= MIN_BASE64 else None
+            if decoded:
+                yield "base64", decoded
+                if part is blob:
+                    break
+    for blob in HEX_BLOB.findall(text):
+        # "3237333135 de pesos": a hex-looking word next to the blob spoils the decode, so try
+        # every run of whole chunks, longest first, and keep the ones that decode
+        chunks = re.split(r"[\s:]+", blob.strip())
+        spans = [(i, j) for i in range(len(chunks)) for j in range(len(chunks), i, -1)] if len(chunks) <= 32 \
+            else [(0, len(chunks))]
+        covered = set()
+        for i, j in sorted(spans, key=lambda s: s[0] - s[1]):
+            if covered & set(range(i, j)):
+                continue
+            decoded = _hex(chunks[i:j])
+            if decoded:
+                covered |= set(range(i, j))
+                yield "hex", decoded
 
 
 def find_leaks(text: str, secrets: list[str], _depth: int = 0) -> list[Leak]:
