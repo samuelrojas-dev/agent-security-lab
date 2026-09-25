@@ -16,6 +16,10 @@ python -m src.judge --model claude        # judge precision/recall on attacks/ju
 pytest -m live -s                         # real model; LAB_MODEL, LAB_DATA, LAB_JUDGE pick what runs
 ```
 
+`action.yml` wraps `python -m src.evaluate` as a composite GitHub Action; `.github/workflows/ci.yml`
+runs the gate through it (`uses: ./`). Keep its inputs in sync with the CLI flags, and pass inputs
+to `run:` steps through `env:`, never as `${{ }}` inside the script.
+
 Everything offline uses `CompromisedLLM` and `data/catalog.json`: no API keys, no Supabase,
 deterministic output. Real-model runs cache progress in `results/<model>/cache.json` and resume.
 

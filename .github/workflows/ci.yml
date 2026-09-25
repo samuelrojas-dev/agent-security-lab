@@ -9,14 +9,11 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install -r requirements.txt
       - run: pytest -m "not live" -q
-      # Architecture gate: a model that obeys every injected instruction must still not be able
-      # to get internal data out of the structural designs. No API keys needed.
+      # Architecture gate, run through this repo's own action so every push also tests the
+      # action: a model that obeys every injected instruction must still not be able to get
+      # internal data out of the structural designs. No API keys needed.
       - name: Worst-case gate (compromised model, mutated attack suite)
-        run: python -m src.evaluate --mutate --gate hardened agent_least_privilege --out results/ci
-      - uses: actions/upload-artifact@v4
-        if: always()
+        uses: ./
         with:
-          name: worst-case-report
-          path: |
-            results/ci/report.md
-            results/ci/report.sarif
+          gate: hardened agent_least_privilege
+          artifact-name: worst-case-report
