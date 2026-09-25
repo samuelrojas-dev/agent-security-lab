@@ -1,0 +1,133 @@
+name: Agent Security Lab
+description: >
+  Run the Agent Security Lab evaluation in CI: the attack suite against the lab's six agent
+  designs, with Markdown, JSON and SARIF reports and an optional gate that fails the job when a
+  gated design leaks.
+author: samuelrojas-dev
+branding:
+  icon: shield
+  color: gray-dark
+
+inputs:
+  model:
+    description: "compromised (offline, no keys), claude or gemini"
+    default: compromised
+  modes:
+    description: "Space-separated designs to run (default: all six)"
+    default: "vulnerable prompt_only hardened agent_prompt_only agent_least_privilege agent_flow_guard"
+  gate:
+    description: "Space-separated designs that must not leak; empty for no gate"
+    default: "hardened agent_least_privilege"
+  mutate:
+    description: "Add the evasion variants of every attack (true/false)"
+    default: "true"
+  trials:
+    description: "Runs per attack (use more than 1 with a real model)"
+    default: "1"
+  judge:
+    description: "LLM judge for inference leaks: claude, gemini, or empty for none"
+    default: ""
+  tool-protocol:
+    description: "auto, native or text"
+    default: auto
+  data:
+    description: "local (data/catalog.json) or supabase (needs the SUPABASE_* env vars)"
+    default: local
+  python-version:
+    description: "Python version to run the lab with"
+    default: "3.12"
+  artifact-name:
+    description: "Name of the uploaded report artifact"
+    default: agent-security-report
+  upload-sarif:
+    description: "Upload report.sarif to GitHub code scanning (needs security-events: write)"
+    default: "false"
+
+outputs:
+  report-dir:
+    description: "Directory holding report.md, report.json and report.sarif"
+    value: ${{ steps.run.outputs.report-dir }}
+  exit-code:
+    description: "0 when the gate passed (or no gate was set), 1 when a gated design leaked"
+    value: ${{ steps.run.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install what this run needs
+      shell: bash
+      env:
+        MODEL: ${{ inputs.model }}
+        JUDGE: ${{ inputs.judge }}
+        DATA: ${{ inputs.data }}
+      run: |
+        set -euo pipefail
+        packages=()
+        for provider in "$MODEL" "$JUDGE"; do
+          case "$provider" in
+            claude) packages+=("anthropic>=0.70.0") ;;
+            gemini) packages+=("google-genai>=1.0.0") ;;
+          esac
+        done
+        if [ "$DATA" = supabase ]; then packages+=("supabase>=2.0.0"); fi
+        if [ ${#packages[@]} -gt 0 ]; then python -m pip install --quiet "${packages[@]}"; fi
+
+    - name: Run the evaluation
+      id: run
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        MODEL: ${{ inputs.model }}
+        MODES: ${{ inputs.modes }}
+        GATE: ${{ inputs.gate }}
+        MUTATE: ${{ inputs.mutate }}
+        TRIALS: ${{ inputs.trials }}
+        JUDGE: ${{ inputs.judge }}
+        PROTOCOL: ${{ inputs.tool-protocol }}
+        DATA: ${{ inputs.data }}
+        OUT: ${{ runner.temp }}/agent-security-report
+      run: |
+        set -uo pipefail
+        set -f  # the lists below are split on spaces, never glob-expanded
+        args=(--model "$MODEL" --data "$DATA" --trials "$TRIALS" --tool-protocol "$PROTOCOL" --out "$OUT")
+        args+=(--modes $MODES)
+        if [ -n "$GATE" ]; then args+=(--gate $GATE); fi
+        if [ "$MUTATE" = true ]; then args+=(--mutate); fi
+        if [ -n "$JUDGE" ]; then args+=(--judge "$JUDGE"); fi
+        python -m src.evaluate "${args[@]}"
+        code=$?
+        echo "report-dir=$OUT" >> "$GITHUB_OUTPUT"
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        if [ -f "$OUT/report.md" ]; then cat "$OUT/report.md" >> "$GITHUB_STEP_SUMMARY"; fi
+        # 1 is the gate verdict and is reported by the last step, after the reports are uploaded;
+        # anything else (bad input, missing key, crash) fails right here.
+        if [ "$code" -ne 0 ] && [ "$code" -ne 1 ]; then exit "$code"; fi
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: |
+          ${{ steps.run.outputs.report-dir }}/report.md
+          ${{ steps.run.outputs.report-dir }}/report.json
+          ${{ steps.run.outputs.report-dir }}/report.sarif
+
+    - if: inputs.upload-sarif == 'true'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ steps.run.outputs.report-dir }}/report.sarif
+        category: agent-security-lab
+
+    - name: Gate verdict
+      shell: bash
+      env:
+        CODE: ${{ steps.run.outputs.exit-code }}
+        GATE: ${{ inputs.gate }}
+      run: |
+        if [ "$CODE" = 1 ]; then
+          echo "::error title=Agent security gate::a gated design leaked internal data ($GATE). See the job summary."
+          exit 1
+        fi

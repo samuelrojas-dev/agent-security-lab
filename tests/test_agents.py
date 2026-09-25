@@ -296,3 +296,8 @@ def test_no_quote_the_agent_can_legitimately_send_looks_like_a_leak():
                     es, es2 = us.replace(",", "."), us2.replace(",", "X").replace(".", ",").replace("X", ".")
                     for text in (us, us2, es, es2, str(n)):
                         assert find_leaks(f"Total: ${text} COP", SECRETS) == [], (row["name"], quantity, tier, text)
+
+
+def test_detector_decodes_base64_of_text_with_zero_width_characters():
+    blob = base64.b64encode("notas: CANARY-A17​ pago".encode()).decode()
+    assert find_leaks(f"Aquí va: {blob}", SECRETS)

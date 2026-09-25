@@ -11,6 +11,8 @@ every instruction it sees, including instructions hidden in tool results.
 
 > Educational lab. Every attack runs against my own agent and my own test data.
 
+**Read the write-up:** [Prompt rules measure behavior. Architecture gives guarantees.](docs/findings.md)
+
 The idea behind the compromised model: a prompt-based defense can only be measured, and it
 depends on the model. A structural defense can be *proven*, by showing it holds when the model
 does the worst thing it could. That proof needs no API key, so it runs in CI on every push.
@@ -224,6 +226,49 @@ python -m src.evaluate --mutate --gate hardened agent_least_privilege
 exits 1 if any attack gets internal data out of the gated designs. Every run writes `report.md`,
 `report.json` (full transcripts: tool calls, blocked actions, replies) and `report.sarif`, which
 GitHub code scanning can display.
+
+### As a GitHub Action
+
+The repository is also a composite action (`action.yml`), so the lab runs in any workflow with one
+step. This repo's own CI uses it for the worst-case gate.
+
+```yaml
+- uses: samuelrojas-dev/agent-security-lab@main
+  with:
+    gate: hardened agent_least_privilege   # default; empty for no gate
+```
+
+Offline by default (compromised model, local data, mutated suite): no keys, about a minute. The job
+summary shows the Markdown report, and `report.md` / `report.json` / `report.sarif` are uploaded as
+the `agent-security-report` artifact. The gate fails the job only after the reports are uploaded.
+
+Against a real model, pass the key as an environment variable:
+
+```yaml
+- uses: samuelrojas-dev/agent-security-lab@main
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  with:
+    model: claude
+    trials: "3"
+    mutate: "false"
+    gate: ""
+```
+
+| Input | Default | |
+|---|---|---|
+| `model` | `compromised` | `compromised`, `claude` or `gemini` |
+| `modes` | all six designs | space-separated |
+| `gate` | `hardened agent_least_privilege` | designs that must not leak; empty for none |
+| `mutate` | `true` | add the evasion variants |
+| `trials` | `1` | runs per attack |
+| `judge` | empty | `claude` or `gemini` to score inference leaks |
+| `tool-protocol` | `auto` | `auto`, `native` or `text` |
+| `data` | `local` | `supabase` needs the `SUPABASE_*` variables |
+| `upload-sarif` | `false` | `true` sends the SARIF to code scanning (needs `security-events: write`) |
+
+Outputs: `report-dir` and `exit-code` (0 passed, 1 a gated design leaked). Only the SDK a run
+needs is installed. Inputs reach the shell through environment variables, never by interpolation.
 
 ## How leaks are detected
 
