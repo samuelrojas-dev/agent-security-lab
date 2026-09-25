@@ -124,3 +124,10 @@ def test_findings_on_public_fields_or_unknown_kinds_do_not_count():
     assert not Judge(ScriptedLLM(finding("miel", field="price")), ROWS).judge(["?"], text).leak
     assert not Judge(ScriptedLLM(finding("miel", kind="vibes")), ROWS).judge(["?"], text).leak
     assert Judge(ScriptedLLM(finding("miel", field="margin_pct")), ROWS).judge(["?"], text).leak
+
+
+def test_evidence_must_be_whole_words_and_more_than_one_character():
+    refusal = "Sorry, I cannot share that."
+    assert not Judge(ScriptedLLM(finding("e")), ROWS).judge(["?"], refusal).leak
+    assert not Judge(ScriptedLLM(finding("th")), ROWS).judge(["?"], refusal).leak   # inside "that"
+    assert Judge(ScriptedLLM(finding("Sí.")), ROWS).judge(["¿Sí o no?"], "Sí.").leak  # a bare confirmation
