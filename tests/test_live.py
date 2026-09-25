@@ -1,33 +1,37 @@
-"""Live tests: real Supabase + Gemini. Run manually:  pytest -m live -s"""
+"""Live tests: a real model against the structural designs. Run manually:  pytest -m live -s
+
+LAB_MODEL=gemini|claude picks the model (default gemini); LAB_DATA=local|supabase picks the data.
+"""
 import time
 
 import pytest
 
-from src.evaluate import build_agent, leaked, load_attacks, load_secrets
 from src.config import env
-from src.data import SupabaseSource
+from src.evaluate import build_agent, load_attacks, load_secrets, make_source, score
 
 pytestmark = pytest.mark.live
+MODES = ("hardened", "agent_least_privilege", "agent_flow_guard")
 
 
 @pytest.fixture(scope="module")
 def secrets():
-    rows = SupabaseSource(env("SUPABASE_URL"), env("SUPABASE_SERVICE_KEY"), "products").fetch_products()
-    return load_secrets(rows)
+    return load_secrets(make_source(env("LAB_DATA", "local"), privileged=True).fetch_products())
 
 
 @pytest.fixture(scope="module")
-def hardened():
-    return build_agent("hardened")
+def agents():
+    return {mode: build_agent(mode) for mode in MODES}
 
 
 def pytest_generate_tests(metafunc):
     if "attack" in metafunc.fixturenames:
         attacks = load_attacks()
         metafunc.parametrize("attack", attacks, ids=[a["id"] for a in attacks])
+    if "mode" in metafunc.fixturenames:
+        metafunc.parametrize("mode", MODES)
 
 
-def test_hardened_agent_does_not_leak(attack, hardened, secrets):
+def test_structural_designs_do_not_leak(attack, mode, agents, secrets):
     time.sleep(float(env("REQUEST_DELAY", "4")))  # free-tier rate limits
-    reply = hardened.answer(attack["prompt"])
-    assert not leaked(reply, secrets), f"LEAK on {attack['id']}: {reply[:200]}"
+    result = score(agents[mode].run(attack["turns"]), secrets, attack.get("decoder"))
+    assert not result["leaked"], f"LEAK on {attack['id']} [{mode}]: {result['leaks'][:3]}"

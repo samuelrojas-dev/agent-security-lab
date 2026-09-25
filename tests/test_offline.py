@@ -71,7 +71,8 @@ def test_attack_file_is_well_formed():
     attacks = json.loads((Path(__file__).parent.parent / "attacks" / "attacks.json").read_text(encoding="utf-8"))
     assert len(attacks) >= 10
     assert len({a["id"] for a in attacks}) == len(attacks)
-    assert all({"id", "category", "prompt"} <= a.keys() for a in attacks)
+    assert all({"id", "category"} <= a.keys() and ("prompt" in a) != ("turns" in a) for a in attacks)
+    assert all(a.get("decoder") in (None, "shift1") for a in attacks)
 
 
 def test_leak_detector_avoids_false_positives():

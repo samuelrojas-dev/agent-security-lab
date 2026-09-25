@@ -3,3 +3,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 results/cache.json
+results/*/cache.json
+results/*/report.json
+results/ci/

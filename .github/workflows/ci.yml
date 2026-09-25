@@ -9,3 +9,14 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install -r requirements.txt
       - run: pytest -m "not live" -q
+      # Architecture gate: a model that obeys every injected instruction must still not be able
+      # to get internal data out of the structural designs. No API keys needed.
+      - name: Worst-case gate (compromised model, mutated attack suite)
+        run: python -m src.evaluate --mutate --gate hardened agent_least_privilege --out results/ci
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: worst-case-report
+          path: |
+            results/ci/report.md
+            results/ci/report.sarif
