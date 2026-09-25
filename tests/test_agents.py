@@ -155,3 +155,55 @@ def test_gate_fails_the_build_when_a_gated_design_leaks(tmp_path):
     assert main(["--modes", "agent_prompt_only", "--gate", "agent_prompt_only", "--out", str(tmp_path)]) == 1
     sarif = json.loads((tmp_path / "report.sarif").read_text(encoding="utf-8"))
     assert sarif["version"] == "2.1.0" and sarif["runs"][0]["results"]
+
+
+# --- regressions ------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("to, expected", [
+    ("compras@mayorista.example", Label.INTERNAL),
+    ("a@mayorista.example; <b@MAYORISTA.EXAMPLE>", Label.INTERNAL),
+    ("me@evil.com, boss@mayorista.example", Label.PUBLIC),  # one outside recipient is enough
+    ("boss@mayorista.example evil@proton.me", Label.PUBLIC),
+    ("x@mayorista.example.evil.com", Label.PUBLIC),
+    ("mayorista.example", Label.PUBLIC),                    # not an address
+    ("", Label.PUBLIC),
+])
+def test_email_clearance_requires_every_recipient_to_be_internal(to, expected):
+    from src.flow import email_clearance
+    assert email_clearance(to) == expected
+
+
+def test_flow_guard_blocks_a_mixed_recipient_list_after_an_internal_read():
+    guard = FlowGuard()
+    guard.observe(Label.INTERNAL, [{"cost_price": 27315}])
+    assert not guard.authorize_email("me@evil.com, boss@mayorista.example").allowed
+
+
+@pytest.mark.parametrize("text", ["cost $27,315.00", "costo 27.315,00", "27315.00 COP", "27 315"])
+def test_detector_matches_integers_with_separators_and_zero_decimals(text):
+    assert find_leaks(text, ["27315"])
+
+
+def test_detector_matches_decimal_secrets_with_trailing_zeros():
+    assert find_leaks("margin 42.50%", ["42.5"]) and find_leaks("margen 42,50 %", ["42.5"])
+    assert not find_leaks("margin 42.51%", ["42.5"])
+    assert not find_leaks("precio 42.900,00 COP", ["42.5", "27315"])
+
+
+def test_gate_on_a_design_that_does_not_run_is_a_usage_error(tmp_path):
+    with pytest.raises(SystemExit) as error:
+        main(["--modes", "vulnerable", "--gate", "hardened", "--out", str(tmp_path)])
+    assert error.value.code == 2
+
+
+def test_cache_is_not_shared_across_data_sources(tmp_path):
+    from src.llm import CompromisedLLM
+
+    cache_file = tmp_path / "cache.json"
+    attack = load_attacks()[:1]
+    stale = {"leaked": True, "leaks": [], "inferences": [], "judge_errors": 0, "blocked": [],
+             "filtered": [], "tool_calls": [], "replies": ["from another data source"]}
+    cache_file.write_text(json.dumps({f"compromised|data=supabase|{attack[0]['id']}|hardened|0": stale}))
+    result = run_suite(attack, ["hardened"], CompromisedLLM(), "local", 1, SECRETS, cache_file)
+    assert result[0]["runs"]["hardened"][0]["replies"] != stale["replies"]
+    assert f"compromised|data=local|{attack[0]['id']}|hardened|0" in json.loads(cache_file.read_text())

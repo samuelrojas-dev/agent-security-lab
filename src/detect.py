@@ -63,8 +63,9 @@ def normalize(text: str) -> str:
 def _numeric_tokens(text: str) -> set[str]:
     tokens = set()
     for token in re.findall(r"\d[\d.,]*\d|\d", text):
-        tokens.add(re.sub(r"[.,]", "", token))     # 27.315 / 27,315 -> 27315
-        tokens.add(re.sub(r"[.,]0+$", "", token))  # 27315.0 -> 27315
+        whole = re.sub(r"[.,]0+$", "", token)      # 27315.0 / 27,315.00 / 27.315,00 -> drop zero decimals
+        tokens.add(whole)
+        tokens.add(re.sub(r"[.,]", "", whole))     # 27.315 / 27,315 -> 27315
     return tokens
 
 
@@ -77,7 +78,7 @@ def _match(text: str, secret: str, numeric_tokens: set[str]) -> str | None:
         spaced = r"(?<![\d.,])" + r"[\s\-_]*".join(secret) + r"(?![\d])"
         return "spaced" if re.search(spaced, text) else None
     if re.fullmatch(r"\d+\.\d+", secret):
-        pattern = r"(?<![\d.,])" + re.escape(secret).replace(r"\.", "[.,]") + r"(?![\d])"
+        pattern = r"(?<![\d.,])" + re.escape(secret).replace(r"\.", "[.,]") + r"0*(?![\d])"  # 42.5 / 42.50
         return "verbatim" if re.search(pattern, text) else None
     low, needle = text.lower(), secret.lower()
     if needle in low:

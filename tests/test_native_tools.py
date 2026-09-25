@@ -146,3 +146,28 @@ def test_gemini_native_round_trip():
     response = contents[2].parts[0].function_response
     assert response.id == "fc_1" and response.name == "quote"
     assert json.loads(response.response["result"])["discount_pct"] == 5
+
+
+@pytest.mark.parametrize("call", [
+    ToolCall("a", "send_email", "not an object"),
+    ToolCall("b", "quote", {"product": 5, "quantity": "many", "discount_pct": None}),
+    ToolCall("c", "search_catalog", {"query": 7}),
+])
+def test_malformed_calls_return_an_error_instead_of_crashing(call):
+    llm = ScriptedNative(Step("", [call]), Step("ok"))
+    transcript = ToolAgent("agent_prompt_only", SOURCE, llm, "native").run(["hi"])
+    assert transcript.replies == ["ok"]
+    result = llm.seen[1][1][-1]["results"][0]
+    assert result["id"] == call.id
+
+
+def test_unhashable_tool_name_is_an_unknown_tool():
+    class Text(LLM):
+        def __init__(self):
+            self.out = ['CALL {"tool": ["x"], "args": {}}', "ok"]
+
+        def chat(self, system, messages):
+            return self.out.pop(0)
+
+    transcript = ToolAgent("agent_prompt_only", SOURCE, Text(), "text").run(["hi"])
+    assert transcript.replies == ["ok"] and transcript.tool_calls[0]["allowed"] is False
