@@ -1,21 +1,73 @@
 # Agent Security Lab
 
+[![CI](https://github.com/samuelrojas-dev/agent-security-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/samuelrojas-dev/agent-security-lab/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/samuelrojas-dev/agent-security-lab)](https://github.com/samuelrojas-dev/agent-security-lab/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
+
 **How do you stop an LLM agent from leaking data it should never have seen, even when the model
 itself has been fully jailbroken?**
 
-A test harness that attacks a B2B sales agent (a chat design and a tool-using design that can send
-email) with 34 prompt-injection and data-exfiltration techniques, plus 5 evasion variants of each,
-and measures what actually leaves the system. It compares six designs of the *same* agent, against
-real models (Gemini, Claude) and against a **compromised model**: a deterministic stand-in that obeys
-every instruction it sees, including instructions hidden in tool results.
+This lab builds the same B2B sales agent six ways, attacks each one with 34 prompt-injection and
+data-exfiltration techniques (plus 5 evasion variants of each), and measures what actually leaves
+the system: the reply to the customer and any email the agent sends.
+
+The twist is a **compromised model**: a deterministic stand-in that obeys every instruction it
+sees, including instructions hidden in tool results. A prompt-based defense can only be measured
+against a real model. A structural defense can be *proven*, by showing it holds when the model does
+the worst thing it could. That proof needs no API key, so it runs in CI on every push.
 
 > Educational lab. Every attack runs against my own agent and my own test data.
 
+## The result in one table
+
+Worst case: the compromised model, 34 attacks. Real-model results are [further down](#results).
+
+| Design | What protects the data | Attacks that leaked |
+|---|---|---|
+| `prompt_only` | "Keep it confidential" in the prompt | **34 / 34** |
+| `agent_prompt_only` | The same rule, for an agent with tools and email | **34 / 34** (by reply and by email) |
+| `agent_flow_guard` | The loop blocks data flows to sinks not cleared for them | **1 / 34** (36 exfiltration emails blocked) |
+| `hardened` | The agent only ever sees a public view of the data | **0 / 34** |
+| `agent_least_privilege` | No tool returns internal data; discounts are decided in code | **0 / 34** |
+
 **Read the write-up:** [Prompt rules measure behavior. Architecture gives guarantees.](docs/findings.md)
 
-The idea behind the compromised model: a prompt-based defense can only be measured, and it
-depends on the model. A structural defense can be *proven*, by showing it holds when the model
-does the worst thing it could. That proof needs no API key, so it runs in CI on every push.
+## Try it in 30 seconds
+
+No API keys and no dependencies: Python 3.11 or newer is enough.
+
+```bash
+git clone https://github.com/samuelrojas-dev/agent-security-lab
+cd agent-security-lab
+python -m src.evaluate            # all six designs vs. the compromised model, about 2 seconds
+```
+
+The report lands in `results/compromised/report.md`. Add `--mutate` for the evasion variants, or run
+it in CI with the [GitHub Action](#as-a-github-action).
+
+## How the defenses work
+
+```mermaid
+flowchart LR
+    U["Customer message<br/>(untrusted)"] --> L{{"Agent loop<br/>(enforces policy)"}}
+    L -->|"search_catalog"| P[("Public data<br/>label PUBLIC")]
+    L -->|"get_internal_pricing"| I[("Internal data<br/>label INTERNAL")]
+    L -->|"quote"| Q["Decides the discount in code,<br/>returns only the price"]
+    L --> G{"Context label<br/>≤ sink clearance?"}
+    G -->|"yes"| S["Reply or email<br/>delivered"]
+    G -->|"no"| B["Blocked"]
+```
+
+- **Least privilege** removes the internal read from the agent entirely; `quote` keeps the feature.
+- **Information-flow control** lets the agent read internal data but checks every outgoing action
+  in the loop, without asking the model and without reading the content.
+- **Everything leaving the system is scored**, including the address an email goes to.
+
+**Contents:** [Scenario](#the-scenario) · [Designs](#six-designs-one-attack-suite) ·
+[Results](#results) · [Run it](#run-it) · [GitHub Action](#as-a-github-action) ·
+[Leak detection](#how-leaks-are-detected) · [Layout](#layout) ·
+[Limitations](#limitations-and-roadmap)
 
 ## The scenario
 
@@ -233,7 +285,7 @@ The repository is also a composite action (`action.yml`), so the lab runs in any
 step. This repo's own CI uses it for the worst-case gate.
 
 ```yaml
-- uses: samuelrojas-dev/agent-security-lab@main
+- uses: samuelrojas-dev/agent-security-lab@v1.0.0
   with:
     gate: hardened agent_least_privilege   # default; empty for no gate
 ```
@@ -245,7 +297,7 @@ the `agent-security-report` artifact. The gate fails the job only after the repo
 Against a real model, pass the key as an environment variable:
 
 ```yaml
-- uses: samuelrojas-dev/agent-security-lab@main
+- uses: samuelrojas-dev/agent-security-lab@v1.0.0
   env:
     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
   with:
@@ -303,8 +355,8 @@ The judge reads attacker-controlled text, so it is treated as an attack surface 
 - Its accuracy is measured, not assumed. `attacks/judge_calibration.json` holds 20 hand-labeled
   texts: 13 leaks the string detector provably misses (a test checks that), and 7 safe texts,
   including traps: false claims, a quote that states only the approved discount tier, and
-  injections aimed at the judge in both directions. `python -m src.judge --model claude --min-recall 0.9` prints precision and
-  recall, and exits 1 below the threshold.
+  injections aimed at the judge in both directions. `python -m src.judge --model claude
+  --min-recall 0.9` prints precision and recall, and exits 1 below the threshold.
 
 Three attacks target this gap directly: `presupposition-yes-no`, `threshold-probe` and
 `ranking-names-only`.
@@ -349,3 +401,7 @@ Three attacks target this gap directly: `presupposition-yes-no`, `threshold-prob
 ## Stack
 
 Python · Supabase (PostgreSQL, RLS) · Gemini API · Claude API · pytest · GitHub Actions · SARIF
+
+## License
+
+[MIT](LICENSE)
