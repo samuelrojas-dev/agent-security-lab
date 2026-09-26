@@ -402,6 +402,12 @@ Three attacks target this gap directly: `presupposition-yes-no`, `threshold-prob
 
 Python · Supabase (PostgreSQL, RLS) · Gemini API · Claude API · pytest · GitHub Actions · SARIF
 
+## How it was built
+
+This project is led by me ([@samuelrojas-dev](https://github.com/samuelrojas-dev)). I used Claude
+Code as an implementation assistant. I defined the problem and the design decisions, reviewed every
+pull request, and verified the results with the test suite and CI.
+
 ## License
 
 [MIT](LICENSE)
