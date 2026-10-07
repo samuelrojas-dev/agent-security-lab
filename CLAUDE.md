@@ -14,6 +14,7 @@ python -m src.evaluate --mutate --gate hardened agent_least_privilege   # the CI
 python -m src.evaluate --model claude|gemini [--trials N] [--judge claude|gemini] [--tool-protocol text]
 python -m src.judge --model claude        # judge precision/recall on attacks/judge_calibration.json
 pytest -m live -s                         # real model; LAB_MODEL, LAB_DATA, LAB_JUDGE pick what runs
+python -m src.orders                      # enumeration experiment -> results/enumeration/
 ```
 
 `action.yml` wraps `python -m src.evaluate` as a composite GitHub Action; `.github/workflows/ci.yml`
@@ -49,6 +50,7 @@ attacks/attacks.json ─► evaluate.run_suite ─► agent.make_agent(mode, sou
 | `src/evaluate.py` | CLI, `build_agent`, `score`, `run_suite`, the `--gate` exit code |
 | `src/report.py` | Wilson intervals, blast radius, report writers |
 | `src/guards.py` | The v1 keyword output filter used by the `hardened` chat design |
+| `src/orders.py` | Separate experiment: order lookup, object-level authz, enumeration, detection (`data/orders.json`) |
 
 ### Tool loop (`ToolAgent`)
 
@@ -108,6 +110,7 @@ clean, and only findings whose evidence quote occurs in the text count (`verifie
 - `tests/test_agents.py`: detector encodings, flow guard, scopes, worst-case guarantees, reports, gate.
 - `tests/test_judge.py`: judge fencing, evidence check, calibration, scoring integration.
 - `tests/test_native_tools.py`: shared loop, and Claude/Gemini request shapes with fake clients.
+- `tests/test_orders.py`: enumeration experiment outcomes per design and attacker profile.
 - `tests/test_live.py`: `@pytest.mark.live`, real models; never runs in CI.
 
 New behavior gets an offline test with a scripted LLM or a fake client; nothing in the offline
