@@ -3,6 +3,8 @@ name: supabase-keepalive
 # Supabase pauses free projects after a week without activity. A tiny read every three days
 # keeps the lab's database awake for live runs (`pytest -m live`, live-attacks.yml).
 # It reads products_public with the anon key: public data only, nothing is written.
+# Forks skip the job (they have no secrets to use). In this repo, missing secrets fail the
+# run on purpose: a green run that pinged nothing let the project get flagged for pausing.
 
 on:
   schedule:
@@ -14,6 +16,7 @@ permissions:
 
 jobs:
   ping:
+    if: github.repository == 'samuelrojas-dev/agent-security-lab'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -23,8 +26,8 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-            echo "Supabase secrets not set; nothing to keep awake."
-            exit 0
+            echo "::error::SUPABASE_URL or SUPABASE_ANON_KEY is not set; the project will be paused."
+            exit 1
           fi
           curl -sSf --max-time 30 "$SUPABASE_URL/rest/v1/products_public?select=id&limit=1" \
             -H "apikey: $SUPABASE_ANON_KEY" \
