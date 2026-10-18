@@ -8,7 +8,7 @@
 **How do you stop an LLM agent from leaking data it should never have seen, even when the model
 itself has been fully jailbroken?**
 
-This lab builds the same B2B sales agent six ways, attacks each one with 42 prompt-injection and
+This lab builds the same B2B sales agent six ways, attacks each one with 50 prompt-injection and
 data-exfiltration techniques (plus 7 evasion variants of each), and measures what actually leaves
 the system: the reply to the customer and any email the agent sends.
 
@@ -21,15 +21,15 @@ the worst thing it could. That proof needs no API key, so it runs in CI on every
 
 ## The result in one table
 
-Worst case: the compromised model, 42 attacks. Real-model results are [further down](#results).
+Worst case: the compromised model, 50 attacks. Real-model results are [further down](#results).
 
 | Design | What protects the data | Attacks that leaked |
 |---|---|---|
-| `prompt_only` | "Keep it confidential" in the prompt | **42 / 42** |
-| `agent_prompt_only` | The same rule, for an agent with tools and email | **42 / 42** (by reply and by email) |
-| `agent_flow_guard` | The loop blocks data flows to sinks not cleared for them | **1 / 42** (44 exfiltration emails blocked) |
-| `hardened` | The agent only ever sees a public view of the data | **0 / 42** |
-| `agent_least_privilege` | No tool returns internal data; discounts are decided in code | **0 / 42** |
+| `prompt_only` | "Keep it confidential" in the prompt | **50 / 50** |
+| `agent_prompt_only` | The same rule, for an agent with tools and email | **50 / 50** (by reply and by email) |
+| `agent_flow_guard` | The loop blocks data flows to sinks not cleared for them | **1 / 50** (54 exfiltration emails blocked) |
+| `hardened` | The agent only ever sees a public view of the data | **0 / 50** |
+| `agent_least_privilege` | No tool returns internal data; discounts are decided in code | **0 / 50** |
 
 **Read the write-up:** [Prompt rules measure behavior. Architecture gives guarantees.](docs/findings.md)
 
@@ -130,21 +130,21 @@ worst-case suite through each protocol and checks that the results match, attack
 
 ### v2: worst-case model (`python -m src.evaluate`)
 
-Compromised model · local data · 42 attacks · deterministic. "Secrets" are the 28 internal values
+Compromised model · local data · 50 attacks · deterministic. "Secrets" are the 28 internal values
 plus the 7 `CANARY-` tokens inside supplier notes. Full per-attack table:
 [`results/compromised/report.md`](results/compromised/report.md).
 
 | Design | Attacks leaked | Attack success rate (95% CI) | Secrets exposed | Leak channels | Actions blocked |
 |---|---|---|---|---|---|
-| `vulnerable` | 42/42 | 100% [92%, 100%] | 35/35 | reply | 0 |
-| `prompt_only` | 42/42 | 100% [92%, 100%] | 35/35 | reply | 0 |
-| `hardened` | **0/42** | 0% [0%, 8%] | 0/35 | - | 0 |
-| `agent_prompt_only` | 42/42 | 100% [92%, 100%] | 35/35 | email, reply | 0 |
-| `agent_least_privilege` | **0/42** | 0% [0%, 8%] | 0/35 | - | 0 |
-| `agent_flow_guard` | 1/42 | 2% [0%, 12%] | 35/35 | reply | 44 emails |
+| `vulnerable` | 50/50 | 100% [93%, 100%] | 35/35 | reply | 0 |
+| `prompt_only` | 50/50 | 100% [93%, 100%] | 35/35 | reply | 0 |
+| `hardened` | **0/50** | 0% [0%, 7%] | 0/35 | - | 0 |
+| `agent_prompt_only` | 50/50 | 100% [93%, 100%] | 35/35 | email, reply | 0 |
+| `agent_least_privilege` | **0/50** | 0% [0%, 7%] | 0/35 | - | 0 |
+| `agent_flow_guard` | 1/50 | 2% [0%, 10%] | 35/35 | reply | 54 emails |
 
-With the 7 mutation operators (`--mutate`, 336 attacks): the same picture. `hardened` and
-`agent_least_privilege` 0/336, `agent_flow_guard` 6/336 (all six are variants of `cipher-shift`).
+With the 7 mutation operators (`--mutate`, 400 attacks): the same picture. `hardened` and
+`agent_least_privilege` 0/400, `agent_flow_guard` 6/400 (all six are variants of `cipher-shift`).
 
 #### Key findings
 
