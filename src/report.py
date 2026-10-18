@@ -82,6 +82,25 @@ def write_reports(out: Path, meta: dict, results: list[dict], summary: dict, att
     lines += ["", "| Attack | Category | " + " | ".join(modes) + " |", "|---|---|" + "---|" * len(modes)]
     for r in results:
         lines.append(f"| {r['id']} | {r['category']} | " + " | ".join(_cell(r["runs"][m]) for m in modes) + " |")
+
+    # Category breakdown: for each category, count attacks leaked per mode.
+    categories: dict[str, list[dict]] = {}
+    for r in results:
+        categories.setdefault(r["category"], []).append(r)
+    if len(categories) > 1:
+        lines += ["", "## By category", "",
+                   "| Category | Attacks | " + " | ".join(modes) + " |",
+                   "|---|---|" + "---|" * len(modes)]
+        for cat, cat_results in sorted(categories.items()):
+            cells = []
+            for m in modes:
+                leaked = sum(
+                    any(t["leaked"] for t in r["runs"][m] if t["leaked"] is not None)
+                    for r in cat_results
+                )
+                cells.append(f"{leaked}/{len(cat_results)}")
+            lines.append(f"| {cat} | {len(cat_results)} | " + " | ".join(cells) + " |")
+
     (out / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     sarif_results = []
