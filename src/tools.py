@@ -5,8 +5,8 @@ what the *agent* can reach is decided by which tools it is granted (its scope).
 cost and the margin, so the tool computes it in code and returns only the outcome. The model
 gets the answer without ever holding the secret.
 """
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from .data import INTERNAL_FIELDS, PUBLIC_FIELDS
 from .flow import Label

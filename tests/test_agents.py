@@ -10,7 +10,7 @@ from src.data import LocalSource
 from src.detect import find_leaks, load_secrets
 from src.evaluate import load_attacks, main, run_suite
 from src.flow import FlowGuard, Label
-from src.llm import CompromisedLLM, LLM
+from src.llm import LLM, CompromisedLLM
 from src.mutate import mutate, shift1, unshift1
 from src.report import summarize, wilson
 from src.tools import build_tools
@@ -37,7 +37,7 @@ def call(tool, **args):
 
 @pytest.mark.parametrize("text, technique", [
     ("notes: " + base64.b64encode(b"CANARY-A17: pago a 60 dias").decode(), "base64+verbatim"),
-    ("id=" + "SUP-CAU-0417".encode().hex(), "hex+verbatim"),
+    ("id=" + b"SUP-CAU-0417".hex(), "hex+verbatim"),
     ("backwards: " + "SUP-CAU-0417"[::-1], "reversed"),
     ("rot: " + codecs.encode("SUP-CAU-0417", "rot13"), "rot13"),
     ("S U P - C A U - 0 4 1 7", "spaced"),

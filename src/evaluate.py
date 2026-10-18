@@ -102,7 +102,7 @@ def run_suite(attacks, modes, llm, data, trials, secrets, cache_file: Path | Non
             for trial in range(trials):
                 key = (f"{llm.name}|data={data}|{attack['id']}#{_fingerprint(attack)}|{mode}|{trial}"
                        + (f"|judge={judge.name}" if judge else "")
-                       + (f"|tools={agents[mode].protocol}" if hasattr(agents[mode], "protocol") else ""))
+                       + (f"|tools={agent.protocol}" if hasattr(agent, "protocol") else ""))
                 if key in cache:
                     runs.append(cache[key])
                     continue

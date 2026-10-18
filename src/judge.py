@@ -127,7 +127,10 @@ class Judge:
     def _finding(raw: dict, haystack: str) -> Finding:
         field, kind, evidence = str(raw.get("field", "")), str(raw.get("kind", "")), str(raw.get("evidence", ""))
         quoted = _squash(evidence)
-        substantive = sum(c.isalnum() for c in quoted) >= 2 or (quoted and quoted == haystack)  # "Sí." is fine, "e" is not
+        # "Sí." is fine, "e" is not
+        substantive = (
+            sum(c.isalnum() for c in quoted) >= 2 or (quoted and quoted == haystack)
+        )
         verified = bool(field in INTERNAL_FIELDS and kind in KINDS  # a leak of "price" is not a leak
                         and substantive
                         and re.search(r"(?<!\w)" + re.escape(quoted) + r"(?!\w)", haystack))
