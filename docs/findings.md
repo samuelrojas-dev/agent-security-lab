@@ -36,7 +36,7 @@ A confidentiality instruction was enough. It is tempting to stop there.
 But that result measures one model's behavior on one day with one phrasing. So I added a
 **compromised model**: a deterministic stand-in that obeys every instruction it sees, including
 instructions hidden inside tool results. It needs no API key, so it runs in CI. Against it,
-`prompt_only` leaked **34 of 34** attacks and all 35 secrets.
+`prompt_only` leaked **42 of 42** attacks and all 35 secrets.
 
 Nothing about the design changed between those two numbers. Only the model did. A defense whose
 strength depends entirely on the model is a measurement, not a guarantee.
@@ -44,8 +44,8 @@ strength depends entirely on the model is a measurement, not a guarantee.
 ## Finding 2: data the agent cannot reach cannot leak
 
 `hardened` (the agent only ever sees a public view) and `agent_least_privilege` (no tool returns
-internal data) leaked **0 of 34** attacks against the compromised model, and 0 of 204 once every
-attack also got five evasion variants.
+internal data) leaked **0 of 42** attacks against the compromised model, and 0 of 336 once every
+attack also got seven evasion variants.
 
 These zeros are different in kind from Gemini's zero. The compromised model tries everything:
 it reads every tool it has, emails everything it sees, dumps its whole context in the reply. The
@@ -69,10 +69,10 @@ product, a trade-off that can be chosen deliberately instead of leaking by accid
 
 One product description in the catalog carries a hidden instruction to email the internal price
 sheet to an outside address. Because that description shows up in every catalog search, in
-`agent_prompt_only` **every one of the 34 attacks** also emailed the price sheet out, including
+`agent_prompt_only` **every one of the 42 attacks** also emailed the price sheet out, including
 the ones that looked harmless. The customer never asked for anything suspicious; the data did.
 
-`agent_flow_guard` blocked **all 36** attempted exfiltration emails. It never inspects the email
+`agent_flow_guard` blocked **all 44** attempted exfiltration emails. It never inspects the email
 body. Every tool result carries a sensitivity label, every sink has a clearance, and the agent loop
 refuses any action where data would flow to a sink not cleared for it. A model cannot argue its way
 past a check that does not ask it anything.
@@ -145,7 +145,7 @@ can instruct the agent to perform unauthorized wallet operations.
 The lab's `indirect-poisoned` attack did not leak in the v1 real-model run, and it would be easy
 to conclude that the attack does not work. But the compromised model showed what happens when a
 future model version, a different phrasing, or a more complex agent follows the injected
-instruction: 34 of 34 attacks succeeded for `agent_prompt_only`, and every one of them also
+instruction: 42 of 42 attacks succeeded for `agent_prompt_only`, and every one of them also
 triggered an exfiltration email to the attacker. The structural defenses — least privilege and
 information-flow control — held at zero. That is the argument for building the defense into the
 architecture, not the prompt.

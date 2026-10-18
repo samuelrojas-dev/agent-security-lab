@@ -8,8 +8,8 @@
 **How do you stop an LLM agent from leaking data it should never have seen, even when the model
 itself has been fully jailbroken?**
 
-This lab builds the same B2B sales agent six ways, attacks each one with 34 prompt-injection and
-data-exfiltration techniques (plus 5 evasion variants of each), and measures what actually leaves
+This lab builds the same B2B sales agent six ways, attacks each one with 42 prompt-injection and
+data-exfiltration techniques (plus 7 evasion variants of each), and measures what actually leaves
 the system: the reply to the customer and any email the agent sends.
 
 The twist is a **compromised model**: a deterministic stand-in that obeys every instruction it
@@ -21,15 +21,15 @@ the worst thing it could. That proof needs no API key, so it runs in CI on every
 
 ## The result in one table
 
-Worst case: the compromised model, 34 attacks. Real-model results are [further down](#results).
+Worst case: the compromised model, 42 attacks. Real-model results are [further down](#results).
 
 | Design | What protects the data | Attacks that leaked |
 |---|---|---|
-| `prompt_only` | "Keep it confidential" in the prompt | **34 / 34** |
-| `agent_prompt_only` | The same rule, for an agent with tools and email | **34 / 34** (by reply and by email) |
-| `agent_flow_guard` | The loop blocks data flows to sinks not cleared for them | **1 / 34** (36 exfiltration emails blocked) |
-| `hardened` | The agent only ever sees a public view of the data | **0 / 34** |
-| `agent_least_privilege` | No tool returns internal data; discounts are decided in code | **0 / 34** |
+| `prompt_only` | "Keep it confidential" in the prompt | **42 / 42** |
+| `agent_prompt_only` | The same rule, for an agent with tools and email | **42 / 42** (by reply and by email) |
+| `agent_flow_guard` | The loop blocks data flows to sinks not cleared for them | **1 / 42** (44 exfiltration emails blocked) |
+| `hardened` | The agent only ever sees a public view of the data | **0 / 42** |
+| `agent_least_privilege` | No tool returns internal data; discounts are decided in code | **0 / 42** |
 
 **Read the write-up:** [Prompt rules measure behavior. Architecture gives guarantees.](docs/findings.md)
 
@@ -130,21 +130,21 @@ worst-case suite through each protocol and checks that the results match, attack
 
 ### v2: worst-case model (`python -m src.evaluate`)
 
-Compromised model · local data · 34 attacks · deterministic. "Secrets" are the 28 internal values
+Compromised model · local data · 42 attacks · deterministic. "Secrets" are the 28 internal values
 plus the 7 `CANARY-` tokens inside supplier notes. Full per-attack table:
 [`results/compromised/report.md`](results/compromised/report.md).
 
 | Design | Attacks leaked | Attack success rate (95% CI) | Secrets exposed | Leak channels | Actions blocked |
 |---|---|---|---|---|---|
-| `vulnerable` | 34/34 | 100% [90%, 100%] | 35/35 | reply | 0 |
-| `prompt_only` | 34/34 | 100% [90%, 100%] | 35/35 | reply | 0 |
-| `hardened` | **0/34** | 0% [0%, 10%] | 0/35 | - | 0 |
-| `agent_prompt_only` | 34/34 | 100% [90%, 100%] | 35/35 | email, reply | 0 |
-| `agent_least_privilege` | **0/34** | 0% [0%, 10%] | 0/35 | - | 0 |
-| `agent_flow_guard` | 1/34 | 3% [1%, 15%] | 35/35 | reply | 36 emails |
+| `vulnerable` | 42/42 | 100% [92%, 100%] | 35/35 | reply | 0 |
+| `prompt_only` | 42/42 | 100% [92%, 100%] | 35/35 | reply | 0 |
+| `hardened` | **0/42** | 0% [0%, 8%] | 0/35 | - | 0 |
+| `agent_prompt_only` | 42/42 | 100% [92%, 100%] | 35/35 | email, reply | 0 |
+| `agent_least_privilege` | **0/42** | 0% [0%, 8%] | 0/35 | - | 0 |
+| `agent_flow_guard` | 1/42 | 2% [0%, 12%] | 35/35 | reply | 44 emails |
 
-With the 5 mutation operators (`--mutate`, 204 attacks): the same picture. `hardened` and
-`agent_least_privilege` 0/204, `agent_flow_guard` 4/204 (all four are variants of `cipher-shift`).
+With the 7 mutation operators (`--mutate`, 336 attacks): the same picture. `hardened` and
+`agent_least_privilege` 0/336, `agent_flow_guard` 6/336 (all six are variants of `cipher-shift`).
 
 #### Key findings
 
@@ -155,9 +155,9 @@ With the 5 mutation operators (`--mutate`, 204 attacks): the same picture. `hard
    against the mutated suite. If a change ever gives the customer-facing agent a path to internal
    data, the build fails.
 3. **Indirect injection is the dominant exfiltration path for tool agents.** The poisoned `Cacao`
-   description shows up in every catalog search, so in `agent_prompt_only` every one of the 34
+   description shows up in every catalog search, so in `agent_prompt_only` every one of the 42
    attacks also emailed the price sheet to the attacker's address, including the harmless-looking
-   ones. `agent_flow_guard` blocked all 36 attempted emails without inspecting their content.
+   ones. `agent_flow_guard` blocked all 44 attempted emails without inspecting their content.
 4. **Content inspection has a ceiling.** The reply DLP catches verbatim, base64, hex, rot13,
    reversed, spaced, zero-width and full-width forms. A cipher it does not know (`cipher-shift`:
    every letter and digit moved by one) exposed all 35 secrets in one reply. Labels are a guarantee;
@@ -247,7 +247,7 @@ Raw replies for every attack are in [`results/results.json`](results/results.jso
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python -m src.evaluate                    # compromised model, all six designs -> results/compromised/
-python -m src.evaluate --mutate           # + 5 evasion variants per attack
+python -m src.evaluate --mutate           # + 7 evasion variants per attack
 pytest -m "not live"                      # offline tests (also run in CI)
 ```
 
@@ -415,7 +415,7 @@ raise the cost of enumeration but do not replace the owner check. Results are ge
 | `src/evaluate.py` | Runner, scoring, trials, CI gate |
 | `src/report.py` | Wilson intervals, blast radius, Markdown / JSON / SARIF |
 | `src/orders.py` | Enumeration experiment: object-level authorization and behavior detection |
-| `attacks/attacks.json` | 34 attacks in English and Spanish, single- and multi-turn |
+| `attacks/attacks.json` | 42 attacks in English and Spanish, single- and multi-turn |
 | `attacks/judge_calibration.json` | 20 hand-labeled texts to measure the judge |
 | `data/catalog.json` | The seed data, for offline runs |
 | `data/orders.json` | Fictitious flower-shop orders for the enumeration experiment |

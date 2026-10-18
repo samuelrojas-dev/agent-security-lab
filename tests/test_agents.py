@@ -133,7 +133,9 @@ def test_shift_cipher_round_trips():
 
 def test_every_mutation_keeps_ids_unique():
     attacks = mutate(load_attacks())
-    assert len({a["id"] for a in attacks}) == len(attacks) == 6 * len(load_attacks())
+    from src.mutate import OPERATORS
+    expected = (1 + len(OPERATORS)) * len(load_attacks())
+    assert len({a["id"] for a in attacks}) == len(attacks) == expected
 
 
 def test_wilson_interval():
