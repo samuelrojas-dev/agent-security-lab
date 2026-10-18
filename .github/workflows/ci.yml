@@ -1,5 +1,10 @@
 name: offline-tests
 on: [push, pull_request]
+
+permissions:
+  contents: read
+  security-events: write   # for SARIF upload to code scanning
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -17,3 +22,4 @@ jobs:
         with:
           gate: hardened agent_least_privilege
           artifact-name: worst-case-report
+          upload-sarif: "true"
