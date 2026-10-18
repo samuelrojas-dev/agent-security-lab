@@ -134,5 +134,24 @@ If the tool that decides "safe" or "leaked" is never attacked, its zeros mean no
 6. **Put the guarantee in CI.** A worst-case model makes architectural properties testable on
    every push, with no API keys.
 
+## Postscript: from the lab to production
+
+In October 2026 I found the lab's indirect injection pattern in a production NFT marketplace with
+an MCP server for AI agent integration. Attacker-controlled NFT metadata (titles, descriptions,
+attributes) flows into the agent's context as tool results — the same path the lab's
+`indirect-poisoned` attack uses with a product description. In this case, a crafted description
+can instruct the agent to perform unauthorized wallet operations.
+
+The lab's `indirect-poisoned` attack did not leak in the v1 real-model run, and it would be easy
+to conclude that the attack does not work. But the compromised model showed what happens when a
+future model version, a different phrasing, or a more complex agent follows the injected
+instruction: 34 of 34 attacks succeeded for `agent_prompt_only`, and every one of them also
+triggered an exfiltration email to the attacker. The structural defenses — least privilege and
+information-flow control — held at zero. That is the argument for building the defense into the
+architecture, not the prompt.
+
+The finding is pending assessment through the platform's bug bounty program. Details will be
+published if disclosure is authorized.
+
 The code, the attack suite, the reports and all of the tests are in this repository. The README
 has the full per-attack tables.

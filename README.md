@@ -420,6 +420,38 @@ raise the cost of enumeration but do not replace the owner check. Results are ge
 | `data/catalog.json` | The seed data, for offline runs |
 | `data/orders.json` | Fictitious flower-shop orders for the enumeration experiment |
 
+## Real-world validation
+
+The indirect injection pattern this lab studies is not theoretical. In October 2026, while testing
+a production NFT marketplace that exposes an MCP server for AI agent integration, I found the same
+attack surface the lab's `indirect-poisoned` scenario models:
+
+- **Lab scenario:** a poisoned product description carries hidden instructions. When the agent
+  calls `search_catalog`, those instructions arrive in the tool result. A compromised or
+  insufficiently guarded model follows them: it reveals internal data in its reply, or emails it
+  to an external address.
+- **Production finding:** NFT metadata (title, description, attributes) is attacker-controlled
+  content. When an AI agent queries the marketplace's MCP server, that metadata flows into the
+  agent's context as tool results. A crafted NFT description can instruct the agent to perform
+  unauthorized wallet operations — the same pattern, with real funds at stake instead of a
+  wholesale catalog.
+
+The structural defenses this lab measures apply directly:
+
+| Lab defense | Production equivalent |
+|---|---|
+| `agent_least_privilege`: no tool returns internal data | The agent has no tool that moves funds without explicit user confirmation outside the LLM context |
+| `agent_flow_guard`: label-based flow control blocks data from reaching unauthorized sinks | Tool results from marketplace queries carry a label; wallet-signing actions require a higher clearance |
+| Content inspection (DLP on replies) | Necessary but insufficient: a cipher or rephrasing bypasses it, as Finding 4 shows |
+
+The finding was reported through the platform's bug bounty program (October 2026) and is pending
+assessment. Details will be published if and when disclosure is authorized.
+
+This is why the lab uses a compromised model: a real model might refuse the injected instruction
+today, but the metadata is permanent, the model version will change, and the defense must hold
+regardless. The question is not "does the model refuse?" but "what can the agent do if it
+doesn't?"
+
 ## Limitations and roadmap
 
 - Inference leaks are only as good as the judge. Its precision and recall on the calibration set
