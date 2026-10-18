@@ -174,7 +174,8 @@ def render(rows: list[dict]) -> str:
         f"40 orders exist, 4 are guest orders. Detection: lock after {DENY_LIMIT} denials per number, "
         f"alert after {GLOBAL_ALERT} denials in total.",
         "",
-        "| Design | Attacker | Numbers | Other customers' orders leaked | Existence confirmed | Numbers locked | Alert at lookup |",
+        "| Design | Attacker | Numbers | Other customers' orders leaked "
+        "| Existence confirmed | Numbers locked | Alert at lookup |",
         "|---|---|---|---|---|---|---|",
     ]
     for r in rows:

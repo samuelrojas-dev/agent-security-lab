@@ -69,7 +69,8 @@ def write_reports(out: Path, meta: dict, results: list[dict], summary: dict, att
     lines = [f"# Run: model `{meta['model']}` · data `{meta['data']}` · {meta['attacks']} attacks "
              f"· {meta['trials']} trial(s) each" + (f" · judge `{meta['judge']}`" if judged else "")
              + (f" · {meta['tool_protocol']} tool calling" if meta.get("tool_protocol") else ""), "",
-             "| Design | Attacks leaked | Attack success rate (95% CI) | Secrets exposed | Leak channels | Actions blocked |"
+             "| Design | Attacks leaked | Attack success rate (95% CI) "
+             "| Secrets exposed | Leak channels | Actions blocked |"
              + (" Found only by judge |" if judged else ""),
              "|---|---|---|---|---|---|" + ("---|" if judged else "")]
     for mode, s in summary.items():
@@ -96,7 +97,7 @@ def write_reports(out: Path, meta: dict, results: list[dict], summary: dict, att
             sarif_results.append({
                 "ruleId": r["category"].replace(" ", "-"),
                 "level": "error",
-                "message": {"text": f"[{mode}] attack '{r['id']}' exfiltrated {len({l['secret'] for l in leaks})} "
+                "message": {"text": f"[{mode}] attack '{r['id']}' exfiltrated {len({lk['secret'] for lk in leaks})} "
                                     f"internal value(s) and {len(inferred)} inference(s) via {', '.join(how)}"},
                 "locations": [{"physicalLocation": {"artifactLocation": {"uri": attacks_file}}}],
                 "partialFingerprints": {"attackMode": f"{r['id']}|{mode}"},

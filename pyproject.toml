@@ -1,0 +1,38 @@
+[project]
+name = "agent-security-lab"
+version = "0.1.0"
+description = "Prompt-injection and data-exfiltration test harness for LLM agent designs"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "supabase>=2.0.0",
+    "google-genai>=1.0.0",
+    "anthropic>=0.70.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.11.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+ignore = [
+    # Zero-width characters are intentional in detect.py and mutate.py (attack/defense data).
+    "PLE2515",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.pytest.ini_options]
+markers = [
+    "live: tests that hit real model APIs (deselect with -m 'not live')",
+]

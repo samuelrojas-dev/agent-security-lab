@@ -3,8 +3,19 @@ import json
 
 import pytest
 
-from src.orders import (ATTACKER, DESIGNS, PROFILES, LOCKED, UNIFORM, Monitor, OrderTool,
-                        attack, load_orders, render, run_all)
+from src.orders import (
+    ATTACKER,
+    DESIGNS,
+    LOCKED,
+    PROFILES,
+    UNIFORM,
+    Monitor,
+    OrderTool,
+    attack,
+    load_orders,
+    render,
+    run_all,
+)
 
 
 @pytest.fixture(scope="module")
