@@ -472,6 +472,13 @@ doesn't?"
 - v1 real-model results cover one model and the chat designs only. Next: the tool designs on
   Gemini and Claude with several trials each.
 
+## Related
+
+**[agent-cost-bench](https://github.com/samuelrojas-dev/agent-cost-bench)** — the other half of
+the problem: while this lab measures *data exfiltration* (what secrets can leave the system), the
+cost bench measures *denial-of-wallet* attacks (how an attacker can inflate your LLM spend). Both
+projects share the same approach: deterministic offline testing, CI gates, and SARIF integration.
+
 ## Stack
 
 Python · Supabase (PostgreSQL, RLS) · Gemini API · Claude API · pytest · GitHub Actions · SARIF
